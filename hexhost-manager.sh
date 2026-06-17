@@ -1,48 +1,195 @@
 #!/bin/bash
 
+# ==========================================
+# HEXHOST MANAGER v2
+# Premium UI + Silent Installer Logs
+# ==========================================
+
 RED="\e[31m"
 GREEN="\e[32m"
 YELLOW="\e[33m"
+BLUE="\e[34m"
+MAGENTA="\e[35m"
 CYAN="\e[36m"
 WHITE="\e[97m"
+GRAY="\e[90m"
+BOLD="\e[1m"
+DIM="\e[2m"
 RESET="\e[0m"
 
+BASE_DIR="/opt/hexhost-manager"
+LOG_DIR="$BASE_DIR/logs"
+BLUEPRINT_DIR="$BASE_DIR/blueprints"
+EXT_DIR="$BASE_DIR/extensions"
 PANEL_DIR="/var/www/pterodactyl"
-BLUEPRINT_DIR="/opt/hexhost-manager/blueprints"
-EXT_DIR="/opt/hexhost-manager/extensions"
+LOG_FILE="$LOG_DIR/latest.log"
+
+mkdir -p "$LOG_DIR" "$BLUEPRINT_DIR" "$EXT_DIR"
 
 pause() {
   echo
+  echo -e "${GRAY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   read -p "Press ENTER to continue..."
 }
 
-banner() {
+line() {
+  echo -e "${RED}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+}
+
+big_banner() {
   clear
-  echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-  echo -e "${CYAN}🚀 HEXHOST MANAGER${RESET}"
-  echo -e "${WHITE}made by HexHost${RESET}"
-  echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   echo
+  line
+  echo -e "${CYAN}${BOLD}"
+  echo "  ██╗  ██╗███████╗██╗  ██╗██╗  ██╗ ██████╗ ███████╗████████╗"
+  echo "  ██║  ██║██╔════╝╚██╗██╔╝██║  ██║██╔═══██╗██╔════╝╚══██╔══╝"
+  echo "  ███████║█████╗   ╚███╔╝ ███████║██║   ██║███████╗   ██║   "
+  echo "  ██╔══██║██╔══╝   ██╔██╗ ██╔══██║██║   ██║╚════██║   ██║   "
+  echo "  ██║  ██║███████╗██╔╝ ██╗██║  ██║╚██████╔╝███████║   ██║   "
+  echo "  ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   "
+  echo -e "${RESET}"
+  echo -e "            ${WHITE}${BOLD}🚀 HEXHOST MANAGER TOOL${RESET}"
+  echo -e "            ${GRAY}${BOLD}Premium Hosting Automation CLI${RESET}"
+  line
+  echo
+}
+
+box_title() {
+  echo -e "${RED}${BOLD}╔══════════════════════════════════════════════════╗${RESET}"
+  printf "${RED}${BOLD}║${RESET} ${CYAN}${BOLD}%-48s${RESET} ${RED}${BOLD}║${RESET}\n" "$1"
+  echo -e "${RED}${BOLD}╚══════════════════════════════════════════════════╝${RESET}"
+  echo
+}
+
+menu_item() {
+  printf " ${WHITE}${BOLD}%2s)${RESET} ${RED}${BOLD}%-42s${RESET}\n" "$1" "$2"
+}
+
+success_msg() {
+  echo -e "${GREEN}${BOLD}✓ $1${RESET}"
+}
+
+error_msg() {
+  echo -e "${RED}${BOLD}✗ $1${RESET}"
+}
+
+info_msg() {
+  echo -e "${CYAN}${BOLD}➤ $1${RESET}"
+}
+
+warn_msg() {
+  echo -e "${YELLOW}${BOLD}⚠ $1${RESET}"
 }
 
 check_root() {
   if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}Run this tool as root.${RESET}"
+    error_msg "Please run this tool as root."
     exit 1
   fi
 }
 
+run_silent() {
+  MSG="$1"
+  shift
+
+  echo -ne "${CYAN}${BOLD}⦿ ${MSG}${RESET} "
+
+  {
+    echo
+    echo "=================================================="
+    echo "[$(date)] $MSG"
+    echo "Command: $*"
+    echo "=================================================="
+    "$@"
+  } >> "$LOG_FILE" 2>&1 &
+
+  PID=$!
+  SPIN='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  i=0
+
+  while kill -0 "$PID" 2>/dev/null; do
+    i=$(( (i+1) % 10 ))
+    echo -ne "\r${CYAN}${BOLD}⦿ ${MSG}${RESET} ${YELLOW}${BOLD}${SPIN:$i:1}${RESET}"
+    sleep 0.12
+  done
+
+  wait "$PID"
+  STATUS=$?
+
+  if [ "$STATUS" -eq 0 ]; then
+    echo -e "\r${GREEN}${BOLD}✓ ${MSG} completed${RESET}                    "
+    return 0
+  else
+    echo -e "\r${RED}${BOLD}✗ ${MSG} failed${RESET}                    "
+    echo -e "${YELLOW}${BOLD}Log file:${RESET} $LOG_FILE"
+    return 1
+  fi
+}
+
+run_bash_silent() {
+  MSG="$1"
+  CMD="$2"
+
+  echo -ne "${CYAN}${BOLD}⦿ ${MSG}${RESET} "
+
+  {
+    echo
+    echo "=================================================="
+    echo "[$(date)] $MSG"
+    echo "Command:"
+    echo "$CMD"
+    echo "=================================================="
+    bash -c "$CMD"
+  } >> "$LOG_FILE" 2>&1 &
+
+  PID=$!
+  SPIN='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  i=0
+
+  while kill -0 "$PID" 2>/dev/null; do
+    i=$(( (i+1) % 10 ))
+    echo -ne "\r${CYAN}${BOLD}⦿ ${MSG}${RESET} ${YELLOW}${BOLD}${SPIN:$i:1}${RESET}"
+    sleep 0.12
+  done
+
+  wait "$PID"
+  STATUS=$?
+
+  if [ "$STATUS" -eq 0 ]; then
+    echo -e "\r${GREEN}${BOLD}✓ ${MSG} completed${RESET}                    "
+    return 0
+  else
+    echo -e "\r${RED}${BOLD}✗ ${MSG} failed${RESET}                    "
+    echo -e "${YELLOW}${BOLD}Log file:${RESET} $LOG_FILE"
+    return 1
+  fi
+}
+
+progress_intro() {
+  echo
+  echo -e "${MAGENTA}${BOLD}╔══════════════════════════════════════════════════╗${RESET}"
+  echo -e "${MAGENTA}${BOLD}║${RESET} ${WHITE}${BOLD}HexHost automation started. Please wait...${RESET}       ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "${MAGENTA}${BOLD}║${RESET} ${GRAY}Real install logs are saved safely in latest.log${RESET}    ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "${MAGENTA}${BOLD}╚══════════════════════════════════════════════════╝${RESET}"
+  echo
+}
+
 main_menu() {
   while true; do
-    banner
-    echo -e "${WHITE}1)${RESET} Pterodactyl Install"
-    echo -e "${WHITE}2)${RESET} Wings Install"
-    echo -e "${WHITE}3)${RESET} Blueprint Installer"
-    echo -e "${WHITE}4)${RESET} Extension Installer"
-    echo -e "${WHITE}5)${RESET} System Info"
-    echo -e "${WHITE}0)${RESET} Exit"
+    big_banner
+    box_title "MAIN MENU"
+
+    menu_item "1" "Pterodactyl Manager"
+    menu_item "2" "Wings Manager"
+    menu_item "3" "Blueprint Installer"
+    menu_item "4" "Extension Installer"
+    menu_item "5" "System Information"
+    menu_item "6" "View Latest Logs"
+    menu_item "0" "Exit"
+
     echo
-    read -p "Select option [0-5]: " opt
+    line
+    read -p "$(echo -e ${YELLOW}${BOLD}'➤ Select option [0-6]: '${RESET})" opt
 
     case "$opt" in
       1) pterodactyl_menu ;;
@@ -50,24 +197,27 @@ main_menu() {
       3) blueprint_menu ;;
       4) extension_menu ;;
       5) system_info ;;
-      0) exit 0 ;;
-      *) echo -e "${RED}Invalid option.${RESET}"; sleep 1 ;;
+      6) view_logs ;;
+      0) clear; exit 0 ;;
+      *) warn_msg "Invalid option"; sleep 1 ;;
     esac
   done
 }
 
 pterodactyl_menu() {
   while true; do
-    banner
-    echo -e "${CYAN}PTERODACTYL MANAGER${RESET}"
+    big_banner
+    box_title "PTERODACTYL MANAGER"
+
+    menu_item "1" "Install Panel"
+    menu_item "2" "Create Panel User"
+    menu_item "3" "Update Panel"
+    menu_item "4" "Uninstall Panel"
+    menu_item "5" "Back"
+
     echo
-    echo -e "${WHITE}1)${RESET} Install Panel"
-    echo -e "${WHITE}2)${RESET} Create Panel User"
-    echo -e "${WHITE}3)${RESET} Update Panel"
-    echo -e "${WHITE}4)${RESET} Uninstall Panel"
-    echo -e "${WHITE}5)${RESET} Back"
-    echo
-    read -p "Select option [1-5]: " opt
+    line
+    read -p "$(echo -e ${YELLOW}${BOLD}'➤ Select option [1-5]: '${RESET})" opt
 
     case "$opt" in
       1) install_panel ;;
@@ -75,98 +225,89 @@ pterodactyl_menu() {
       3) update_panel ;;
       4) uninstall_panel ;;
       5) break ;;
-      *) echo -e "${RED}Invalid option.${RESET}"; sleep 1 ;;
+      *) warn_msg "Invalid option"; sleep 1 ;;
     esac
   done
 }
 
 install_panel() {
-  banner
-  echo -e "${CYAN}Pterodactyl Panel Installer${RESET}"
+  big_banner
+  box_title "INSTALL PTERODACTYL PANEL"
+
+  echo -e "${WHITE}${BOLD}Enter your panel domain.${RESET}"
+  echo -e "${GRAY}${BOLD}Example: panel.example.in${RESET}"
   echo
-  read -p "Enter panel domain example panel.example.in: " DOMAIN
+  read -p "$(echo -e ${YELLOW}${BOLD}'Panel domain: '${RESET})" DOMAIN
 
   if [ -z "$DOMAIN" ]; then
-    echo -e "${RED}Domain is required.${RESET}"
+    error_msg "Domain is required."
     pause
     return
   fi
 
   ADMIN_EMAIL="admin@$DOMAIN"
   ADMIN_USER="admin"
-  ADMIN_PASS=$(openssl rand -base64 16 | tr -dc 'A-Za-z0-9' | head -c 16)
-
-  echo
-  echo -e "${YELLOW}Installing panel for: $DOMAIN${RESET}"
-  echo
-
-  apt update -y
-  apt install -y software-properties-common curl apt-transport-https ca-certificates gnupg unzip tar git nginx redis-server mariadb-server
-
-  add-apt-repository -y ppa:ondrej/php
-  apt update -y
-
-  apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-gd php8.3-mysql php8.3-mbstring php8.3-bcmath php8.3-xml php8.3-curl php8.3-zip php8.3-intl php8.3-sqlite3 php8.3-redis php8.3-tokenizer php8.3-dom
-
-  curl -sS https://getcomposer.org/installer | php
-  mv composer.phar /usr/local/bin/composer
-
-  mkdir -p "$PANEL_DIR"
-  cd "$PANEL_DIR"
-
-  curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
-  tar -xzvf panel.tar.gz
-  chmod -R 755 storage/* bootstrap/cache/
-
-  cp .env.example .env
-
+  ADMIN_PASS=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 16)
   DB_PASS=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 20)
 
-  mysql -u root <<MYSQL
+  progress_intro
+
+  run_bash_silent "Preparing server packages" "
+    apt update -y &&
+    apt install -y software-properties-common curl apt-transport-https ca-certificates gnupg unzip tar git nginx redis-server mariadb-server
+  " || { pause; return; }
+
+  run_bash_silent "Installing PHP 8.3 and extensions" "
+    add-apt-repository -y ppa:ondrej/php &&
+    apt update -y &&
+    apt install -y php8.3 php8.3-cli php8.3-fpm php8.3-gd php8.3-mysql php8.3-mbstring php8.3-bcmath php8.3-xml php8.3-curl php8.3-zip php8.3-intl php8.3-sqlite3 php8.3-redis php8.3-tokenizer php8.3-dom
+  " || { pause; return; }
+
+  run_bash_silent "Installing Composer" "
+    curl -sS https://getcomposer.org/installer | php &&
+    mv composer.phar /usr/local/bin/composer || true
+  " || { pause; return; }
+
+  run_bash_silent "Downloading Pterodactyl Panel" "
+    mkdir -p $PANEL_DIR &&
+    cd $PANEL_DIR &&
+    curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz &&
+    tar -xzf panel.tar.gz &&
+    chmod -R 755 storage/* bootstrap/cache/ &&
+    cp .env.example .env
+  " || { pause; return; }
+
+  run_bash_silent "Creating database" "
+    mysql -u root <<MYSQL
 CREATE DATABASE IF NOT EXISTS panel;
 CREATE USER IF NOT EXISTS 'pterodactyl'@'127.0.0.1' IDENTIFIED BY '$DB_PASS';
 GRANT ALL PRIVILEGES ON panel.* TO 'pterodactyl'@'127.0.0.1' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 MYSQL
+  " || { pause; return; }
 
-  COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader
+  run_bash_silent "Installing panel dependencies" "
+    cd $PANEL_DIR &&
+    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader
+  " || { pause; return; }
 
-  php artisan key:generate --force
+  run_bash_silent "Configuring panel environment" "
+    cd $PANEL_DIR &&
+    php artisan key:generate --force &&
+    php artisan p:environment:setup --author='$ADMIN_EMAIL' --url='https://$DOMAIN' --timezone='Asia/Kolkata' --cache='redis' --session='redis' --queue='redis' --redis-host='127.0.0.1' --redis-pass='null' --redis-port='6379' --settings-ui='yes' &&
+    php artisan p:environment:database --host='127.0.0.1' --port='3306' --database='panel' --username='pterodactyl' --password='$DB_PASS' &&
+    php artisan migrate --seed --force
+  " || { pause; return; }
 
-  php artisan p:environment:setup \
-    --author="$ADMIN_EMAIL" \
-    --url="https://$DOMAIN" \
-    --timezone="Asia/Kolkata" \
-    --cache="redis" \
-    --session="redis" \
-    --queue="redis" \
-    --redis-host="127.0.0.1" \
-    --redis-pass="null" \
-    --redis-port="6379" \
-    --settings-ui="yes"
+  run_bash_silent "Creating admin user automatically" "
+    cd $PANEL_DIR &&
+    php artisan p:user:make --email='$ADMIN_EMAIL' --username='$ADMIN_USER' --name-first='HexHost' --name-last='Admin' --password='$ADMIN_PASS' --admin=1
+  " || true
 
-  php artisan p:environment:database \
-    --host="127.0.0.1" \
-    --port="3306" \
-    --database="panel" \
-    --username="pterodactyl" \
-    --password="$DB_PASS"
+  PHP_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | sort -V | tail -n1)
 
-  php artisan migrate --seed --force
-
-  php artisan p:user:make \
-    --email="$ADMIN_EMAIL" \
-    --username="$ADMIN_USER" \
-    --name-first="HexHost" \
-    --name-last="Admin" \
-    --password="$ADMIN_PASS" \
-    --admin=1 || true
-
-  chown -R www-data:www-data "$PANEL_DIR"
-
-  PHP_SOCK=$(ls /run/php/php*-fpm.sock | sort -V | tail -n1)
-
-  cat > /etc/nginx/sites-available/pterodactyl.conf <<EOF
+  run_bash_silent "Configuring Nginx" "
+    cat > /etc/nginx/sites-available/pterodactyl.conf <<NGINX
 server {
     listen 80;
     listen [::]:80;
@@ -181,26 +322,30 @@ server {
     sendfile off;
 
     location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
+        try_files \\\$uri \\\$uri/ /index.php?\\\$query_string;
     }
 
-    location ~ \.php\$ {
+    location ~ \\\.php\\\$ {
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:$PHP_SOCK;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME \\\$document_root\\\$fastcgi_script_name;
         include fastcgi_params;
     }
 
-    location ~ /\.ht {
+    location ~ /\\.ht {
         deny all;
     }
 }
-EOF
+NGINX
 
-  rm -f /etc/nginx/sites-enabled/default
-  ln -sf /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf
+    rm -f /etc/nginx/sites-enabled/default &&
+    ln -sf /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf &&
+    chown -R www-data:www-data $PANEL_DIR &&
+    nginx -t
+  " || { pause; return; }
 
-  cat > /etc/systemd/system/pteroq.service <<EOF
+  run_bash_silent "Starting panel services" "
+    cat > /etc/systemd/system/pteroq.service <<SERVICE
 [Unit]
 Description=Pterodactyl Queue Worker
 After=redis-server.service
@@ -216,151 +361,165 @@ RestartSec=5s
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SERVICE
 
-  systemctl enable --now redis-server
-  systemctl enable --now php8.3-fpm
-  systemctl enable --now nginx
-  systemctl enable --now pteroq
-
-  nginx -t
-  systemctl restart nginx
-  systemctl restart pteroq
+    systemctl daemon-reload &&
+    systemctl enable --now redis-server &&
+    systemctl enable --now php8.3-fpm &&
+    systemctl enable --now nginx &&
+    systemctl enable --now pteroq &&
+    systemctl restart nginx &&
+    systemctl restart pteroq
+  " || { pause; return; }
 
   echo
-  echo -e "${GREEN}Panel installed.${RESET}"
-  echo -e "${CYAN}URL:${RESET} https://$DOMAIN"
-  echo -e "${CYAN}Admin Email:${RESET} $ADMIN_EMAIL"
-  echo -e "${CYAN}Username:${RESET} $ADMIN_USER"
-  echo -e "${CYAN}Password:${RESET} $ADMIN_PASS"
+  echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════════╗${RESET}"
+  echo -e "${GREEN}${BOLD}║            PANEL INSTALL COMPLETED              ║${RESET}"
+  echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════╝${RESET}"
   echo
-  echo -e "${YELLOW}Set Cloudflare DNS first, then add SSL manually or from tool v2.${RESET}"
+  echo -e "${WHITE}${BOLD}Panel URL:${RESET} ${CYAN}https://$DOMAIN${RESET}"
+  echo -e "${WHITE}${BOLD}Admin Email:${RESET} ${CYAN}$ADMIN_EMAIL${RESET}"
+  echo -e "${WHITE}${BOLD}Username:${RESET} ${CYAN}$ADMIN_USER${RESET}"
+  echo -e "${WHITE}${BOLD}Password:${RESET} ${CYAN}$ADMIN_PASS${RESET}"
+  echo
+  warn_msg "Point DNS to this VPS, then install SSL."
   pause
 }
 
 create_panel_user() {
-  banner
+  big_banner
+  box_title "CREATE PANEL USER"
 
   if [ ! -d "$PANEL_DIR" ]; then
-    echo -e "${RED}Panel not found at $PANEL_DIR${RESET}"
+    error_msg "Panel not found at $PANEL_DIR"
     pause
     return
   fi
 
-  cd "$PANEL_DIR"
+  echo -e "${GRAY}${BOLD}Example email: admin@example.in${RESET}"
+  read -p "$(echo -e ${YELLOW}${BOLD}'Admin email: '${RESET})" EMAIL
+  read -p "$(echo -e ${YELLOW}${BOLD}'Username: '${RESET})" USERNAME
 
-  read -p "Enter admin email example admin@example.in: " EMAIL
-  read -p "Enter username example admin: " USERNAME
-  PASSWORD=$(openssl rand -base64 16 | tr -dc 'A-Za-z0-9' | head -c 16)
+  PASSWORD=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 16)
 
-  php artisan p:user:make \
-    --email="$EMAIL" \
-    --username="$USERNAME" \
-    --name-first="HexHost" \
-    --name-last="Admin" \
-    --password="$PASSWORD" \
-    --admin=1 || true
+  run_bash_silent "Creating panel user" "
+    cd $PANEL_DIR &&
+    php artisan p:user:make --email='$EMAIL' --username='$USERNAME' --name-first='HexHost' --name-last='Admin' --password='$PASSWORD' --admin=1
+  " || { pause; return; }
 
   echo
-  echo -e "${GREEN}User created.${RESET}"
-  echo -e "${CYAN}Email:${RESET} $EMAIL"
-  echo -e "${CYAN}Username:${RESET} $USERNAME"
-  echo -e "${CYAN}Password:${RESET} $PASSWORD"
+  success_msg "User created"
+  echo -e "${WHITE}${BOLD}Email:${RESET} $EMAIL"
+  echo -e "${WHITE}${BOLD}Username:${RESET} $USERNAME"
+  echo -e "${WHITE}${BOLD}Password:${RESET} $PASSWORD"
   pause
 }
 
 update_panel() {
-  banner
+  big_banner
+  box_title "UPDATE PANEL"
 
   if [ ! -d "$PANEL_DIR" ]; then
-    echo -e "${RED}Panel not found at $PANEL_DIR${RESET}"
+    error_msg "Panel not found."
     pause
     return
   fi
 
-  cd "$PANEL_DIR"
+  progress_intro
 
-  php artisan down || true
-  curl -L https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz | tar -xzv
-  chmod -R 755 storage/* bootstrap/cache
-  COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader
-  php artisan view:clear
-  php artisan config:clear
-  php artisan migrate --seed --force
-  chown -R www-data:www-data "$PANEL_DIR"
-  php artisan queue:restart
-  php artisan up
+  run_bash_silent "Updating Pterodactyl Panel" "
+    cd $PANEL_DIR &&
+    php artisan down || true
+    curl -L https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz | tar -xzv
+    chmod -R 755 storage/* bootstrap/cache
+    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader
+    php artisan view:clear
+    php artisan config:clear
+    php artisan migrate --seed --force
+    chown -R www-data:www-data $PANEL_DIR
+    php artisan queue:restart
+    php artisan up
+    systemctl restart pteroq
+    systemctl restart nginx
+  " || { pause; return; }
 
-  systemctl restart pteroq
-  systemctl restart nginx
-
-  echo -e "${GREEN}Panel updated.${RESET}"
+  success_msg "Panel updated successfully."
   pause
 }
 
 uninstall_panel() {
-  banner
-  echo -e "${RED}This will remove Pterodactyl panel files and nginx config.${RESET}"
+  big_banner
+  box_title "UNINSTALL PANEL"
+
+  echo -e "${RED}${BOLD}This will remove panel files and Nginx config.${RESET}"
   read -p "Type DELETE to continue: " CONFIRM
 
   if [ "$CONFIRM" != "DELETE" ]; then
-    echo "Cancelled."
+    warn_msg "Cancelled."
     pause
     return
   fi
 
-  systemctl stop pteroq 2>/dev/null || true
-  systemctl disable pteroq 2>/dev/null || true
-  rm -f /etc/systemd/system/pteroq.service
-  rm -rf "$PANEL_DIR"
-  rm -f /etc/nginx/sites-enabled/pterodactyl.conf
-  rm -f /etc/nginx/sites-available/pterodactyl.conf
-  systemctl daemon-reload
-  systemctl restart nginx
+  run_bash_silent "Removing Pterodactyl Panel" "
+    systemctl stop pteroq 2>/dev/null || true
+    systemctl disable pteroq 2>/dev/null || true
+    rm -f /etc/systemd/system/pteroq.service
+    rm -rf $PANEL_DIR
+    rm -f /etc/nginx/sites-enabled/pterodactyl.conf
+    rm -f /etc/nginx/sites-available/pterodactyl.conf
+    systemctl daemon-reload
+    systemctl restart nginx
+  " || true
 
-  echo -e "${GREEN}Panel removed.${RESET}"
+  success_msg "Panel removed."
   pause
 }
 
 wings_menu() {
   while true; do
-    banner
-    echo -e "${CYAN}WINGS MANAGER${RESET}"
+    big_banner
+    box_title "WINGS MANAGER"
+
+    menu_item "1" "Install Wings"
+    menu_item "2" "Restart Wings"
+    menu_item "3" "Wings Status"
+    menu_item "4" "Uninstall Wings"
+    menu_item "5" "Back"
+
     echo
-    echo -e "${WHITE}1)${RESET} Install Wings"
-    echo -e "${WHITE}2)${RESET} Restart Wings"
-    echo -e "${WHITE}3)${RESET} Wings Status"
-    echo -e "${WHITE}4)${RESET} Uninstall Wings"
-    echo -e "${WHITE}5)${RESET} Back"
-    echo
-    read -p "Select option [1-5]: " opt
+    line
+    read -p "$(echo -e ${YELLOW}${BOLD}'➤ Select option [1-5]: '${RESET})" opt
 
     case "$opt" in
       1) install_wings ;;
-      2) systemctl restart wings; systemctl status wings --no-pager; pause ;;
-      3) systemctl status wings --no-pager; journalctl -u wings -n 60 --no-pager; pause ;;
+      2) run_silent "Restarting Wings" systemctl restart wings; pause ;;
+      3) wings_status ;;
       4) uninstall_wings ;;
       5) break ;;
-      *) echo -e "${RED}Invalid option.${RESET}"; sleep 1 ;;
+      *) warn_msg "Invalid option"; sleep 1 ;;
     esac
   done
 }
 
 install_wings() {
-  banner
-  echo -e "${CYAN}Wings Installer${RESET}"
-  echo
-  echo "After install, paste your Wings config from Pterodactyl panel."
-  echo
+  big_banner
+  box_title "INSTALL WINGS"
 
-  curl -sSL https://get.docker.com/ | CHANNEL=stable bash
-  systemctl enable --now docker
+  progress_intro
 
-  mkdir -p /etc/pterodactyl
-  curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64
-  chmod u+x /usr/local/bin/wings
+  run_bash_silent "Installing Docker" "
+    curl -sSL https://get.docker.com/ | CHANNEL=stable bash &&
+    systemctl enable --now docker
+  " || { pause; return; }
 
-  cat > /etc/systemd/system/wings.service <<'EOF'
+  run_bash_silent "Installing Wings binary" "
+    mkdir -p /etc/pterodactyl &&
+    curl -L -o /usr/local/bin/wings https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64 &&
+    chmod u+x /usr/local/bin/wings
+  " || { pause; return; }
+
+  run_bash_silent "Creating Wings service" "
+    cat > /etc/systemd/system/wings.service <<SERVICE
 [Unit]
 Description=Pterodactyl Wings Daemon
 After=docker.service
@@ -380,168 +539,237 @@ RestartSec=5s
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SERVICE
 
-  systemctl enable wings
+    systemctl daemon-reload &&
+    systemctl enable wings
+  " || { pause; return; }
 
-  echo -e "${GREEN}Wings installed.${RESET}"
-  echo "Now paste node config:"
-  echo "nano /etc/pterodactyl/config.yml"
-  echo "Then run: systemctl restart wings"
+  success_msg "Wings installed."
+  echo
+  warn_msg "Now paste node config:"
+  echo -e "${CYAN}${BOLD}nano /etc/pterodactyl/config.yml${RESET}"
+  echo -e "${CYAN}${BOLD}systemctl restart wings${RESET}"
+  pause
+}
+
+wings_status() {
+  big_banner
+  box_title "WINGS STATUS"
+
+  systemctl status wings --no-pager || true
+  echo
+  echo -e "${CYAN}${BOLD}Latest Wings Logs:${RESET}"
+  journalctl -u wings -n 50 --no-pager || true
   pause
 }
 
 uninstall_wings() {
-  banner
+  big_banner
+  box_title "UNINSTALL WINGS"
+
   read -p "Type DELETE to remove Wings: " CONFIRM
 
   if [ "$CONFIRM" != "DELETE" ]; then
-    echo "Cancelled."
+    warn_msg "Cancelled."
     pause
     return
   fi
 
-  systemctl stop wings 2>/dev/null || true
-  systemctl disable wings 2>/dev/null || true
-  rm -f /usr/local/bin/wings
-  rm -f /etc/systemd/system/wings.service
-  systemctl daemon-reload
+  run_bash_silent "Removing Wings" "
+    systemctl stop wings 2>/dev/null || true
+    systemctl disable wings 2>/dev/null || true
+    rm -f /usr/local/bin/wings
+    rm -f /etc/systemd/system/wings.service
+    systemctl daemon-reload
+  " || true
 
-  echo -e "${GREEN}Wings removed. Config folder kept at /etc/pterodactyl${RESET}"
+  success_msg "Wings removed. Config folder kept at /etc/pterodactyl"
   pause
 }
 
 blueprint_menu() {
   while true; do
-    banner
-    echo -e "${CYAN}BLUEPRINT MANAGER${RESET}"
+    big_banner
+    box_title "BLUEPRINT INSTALLER"
+
+    menu_item "1" "Install Blueprint Framework"
+    menu_item "2" "Install Local Blueprint File"
+    menu_item "3" "List Local Blueprints"
+    menu_item "4" "Back"
+
     echo
-    echo -e "${WHITE}1)${RESET} Install Blueprint Framework"
-    echo -e "${WHITE}2)${RESET} Install Local Blueprint File"
-    echo -e "${WHITE}3)${RESET} List Blueprint Files"
-    echo -e "${WHITE}4)${RESET} Back"
-    echo
-    read -p "Select option [1-4]: " opt
+    line
+    read -p "$(echo -e ${YELLOW}${BOLD}'➤ Select option [1-4]: '${RESET})" opt
 
     case "$opt" in
       1) install_blueprint_framework ;;
       2) install_local_blueprint ;;
-      3) ls -lah "$BLUEPRINT_DIR"; pause ;;
+      3) list_blueprints ;;
       4) break ;;
-      *) echo -e "${RED}Invalid option.${RESET}"; sleep 1 ;;
+      *) warn_msg "Invalid option"; sleep 1 ;;
     esac
   done
 }
 
 install_blueprint_framework() {
-  banner
-  echo -e "${YELLOW}Put your Blueprint framework install command here.${RESET}"
+  big_banner
+  box_title "INSTALL BLUEPRINT FRAMEWORK"
+
+  echo -e "${YELLOW}${BOLD}Add your custom Blueprint framework command here.${RESET}"
   echo
-  echo "Edit this function in:"
-  echo "/opt/hexhost-manager/hexhost-manager.sh"
+  echo -e "${WHITE}${BOLD}Edit:${RESET} /opt/hexhost-manager/hexhost-manager.sh"
+  echo
+  echo -e "${GRAY}Function name: install_blueprint_framework${RESET}"
   pause
 }
 
 install_local_blueprint() {
-  banner
-  echo -e "${CYAN}Local Blueprint Installer${RESET}"
-  echo
+  big_banner
+  box_title "INSTALL LOCAL BLUEPRINT"
 
   mkdir -p "$BLUEPRINT_DIR"
 
-  echo "Upload your .blueprint files to:"
-  echo "$BLUEPRINT_DIR"
+  echo -e "${WHITE}${BOLD}Upload .blueprint files here:${RESET}"
+  echo -e "${CYAN}${BOLD}$BLUEPRINT_DIR${RESET}"
   echo
-  ls -1 "$BLUEPRINT_DIR"/*.blueprint 2>/dev/null || true
+  ls -1 "$BLUEPRINT_DIR"/*.blueprint 2>/dev/null || echo "No blueprint files found."
   echo
-
-  read -p "Enter blueprint filename example theme.blueprint: " FILE
+  read -p "$(echo -e ${YELLOW}${BOLD}'Enter file name example xyz.blueprint: '${RESET})" FILE
 
   if [ ! -f "$BLUEPRINT_DIR/$FILE" ]; then
-    echo -e "${RED}File not found: $BLUEPRINT_DIR/$FILE${RESET}"
+    error_msg "File not found: $BLUEPRINT_DIR/$FILE"
     pause
     return
   fi
 
-  cd "$PANEL_DIR"
+  progress_intro
 
-  echo -e "${YELLOW}Installing $FILE ...${RESET}"
+  run_bash_silent "Installing blueprint $FILE" "
+    cd $PANEL_DIR &&
+    blueprint -install '$BLUEPRINT_DIR/$FILE' &&
+    php artisan optimize:clear &&
+    chown -R www-data:www-data $PANEL_DIR
+  " || { pause; return; }
 
-  # Change this line to your real custom command if different.
-  blueprint -install "$BLUEPRINT_DIR/$FILE" || true
+  success_msg "Blueprint installed."
+  pause
+}
 
-  php artisan optimize:clear || true
-  chown -R www-data:www-data "$PANEL_DIR"
-
-  echo -e "${GREEN}Blueprint install command executed.${RESET}"
+list_blueprints() {
+  big_banner
+  box_title "LOCAL BLUEPRINT FILES"
+  ls -lah "$BLUEPRINT_DIR"
   pause
 }
 
 extension_menu() {
   while true; do
-    banner
-    echo -e "${CYAN}EXTENSION MANAGER${RESET}"
+    big_banner
+    box_title "EXTENSION INSTALLER"
+
+    menu_item "1" "Install Local Extension"
+    menu_item "2" "List Local Extensions"
+    menu_item "3" "Back"
+
     echo
-    echo -e "${WHITE}1)${RESET} Install Local Extension"
-    echo -e "${WHITE}2)${RESET} List Extension Files"
-    echo -e "${WHITE}3)${RESET} Back"
-    echo
-    read -p "Select option [1-3]: " opt
+    line
+    read -p "$(echo -e ${YELLOW}${BOLD}'➤ Select option [1-3]: '${RESET})" opt
 
     case "$opt" in
       1) install_local_extension ;;
-      2) ls -lah "$EXT_DIR"; pause ;;
+      2) list_extensions ;;
       3) break ;;
-      *) echo -e "${RED}Invalid option.${RESET}"; sleep 1 ;;
+      *) warn_msg "Invalid option"; sleep 1 ;;
     esac
   done
 }
 
 install_local_extension() {
-  banner
+  big_banner
+  box_title "INSTALL LOCAL EXTENSION"
+
   mkdir -p "$EXT_DIR"
 
-  echo "Upload extension files to:"
-  echo "$EXT_DIR"
+  echo -e "${WHITE}${BOLD}Upload extension files here:${RESET}"
+  echo -e "${CYAN}${BOLD}$EXT_DIR${RESET}"
   echo
   ls -lah "$EXT_DIR"
   echo
 
-  read -p "Enter extension file/folder name: " EXT
+  read -p "$(echo -e ${YELLOW}${BOLD}'Enter extension file/folder name: '${RESET})" EXT
 
   if [ ! -e "$EXT_DIR/$EXT" ]; then
-    echo -e "${RED}Extension not found.${RESET}"
+    error_msg "Extension not found."
     pause
     return
   fi
 
-  cd "$PANEL_DIR"
+  progress_intro
 
-  echo -e "${YELLOW}Running custom extension install command...${RESET}"
+  run_bash_silent "Installing extension $EXT" "
+    cd $PANEL_DIR &&
+    blueprint -install '$EXT_DIR/$EXT' &&
+    php artisan optimize:clear &&
+    chown -R www-data:www-data $PANEL_DIR
+  " || { pause; return; }
 
-  # Put your real extension command here.
-  # Example:
-  # blueprint -install "$EXT_DIR/$EXT"
+  success_msg "Extension installed."
+  pause
+}
 
-  blueprint -install "$EXT_DIR/$EXT" || true
-
-  php artisan optimize:clear || true
-  chown -R www-data:www-data "$PANEL_DIR"
-
-  echo -e "${GREEN}Extension command executed.${RESET}"
+list_extensions() {
+  big_banner
+  box_title "LOCAL EXTENSION FILES"
+  ls -lah "$EXT_DIR"
   pause
 }
 
 system_info() {
-  banner
-  hostnamectl
+  big_banner
+  box_title "SYSTEM INFORMATION"
+
+  HOSTNAME=$(hostname -f 2>/dev/null || hostname)
+  IP=$(curl -4 -s ifconfig.me 2>/dev/null || curl -4 -s icanhazip.com 2>/dev/null || echo "Unknown")
+  OS=$(grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d '"')
+  UPTIME=$(uptime -p)
+  CPU=$(lscpu | grep "Model name" | sed 's/Model name:[ \t]*//')
+  RAM=$(free -h | awk '/Mem:/ {print $3 " / " $2}')
+  DISK=$(df -h / | awk 'NR==2 {print $3 " / " $2 " used (" $5 ")"}')
+
+  echo -e "${RED}${BOLD}╔══════════════════════════════════════════════════╗${RESET}"
+  printf "${RED}${BOLD}║${RESET} ${WHITE}${BOLD}%-16s${RESET} ${CYAN}${BOLD}%-29s${RESET} ${RED}${BOLD}║${RESET}\n" "Hostname:" "$HOSTNAME"
+  printf "${RED}${BOLD}║${RESET} ${WHITE}${BOLD}%-16s${RESET} ${CYAN}${BOLD}%-29s${RESET} ${RED}${BOLD}║${RESET}\n" "Public IP:" "$IP"
+  printf "${RED}${BOLD}║${RESET} ${WHITE}${BOLD}%-16s${RESET} ${CYAN}${BOLD}%-29s${RESET} ${RED}${BOLD}║${RESET}\n" "OS:" "$OS"
+  printf "${RED}${BOLD}║${RESET} ${WHITE}${BOLD}%-16s${RESET} ${CYAN}${BOLD}%-29s${RESET} ${RED}${BOLD}║${RESET}\n" "Uptime:" "$UPTIME"
+  printf "${RED}${BOLD}║${RESET} ${WHITE}${BOLD}%-16s${RESET} ${CYAN}${BOLD}%-29s${RESET} ${RED}${BOLD}║${RESET}\n" "RAM:" "$RAM"
+  printf "${RED}${BOLD}║${RESET} ${WHITE}${BOLD}%-16s${RESET} ${CYAN}${BOLD}%-29s${RESET} ${RED}${BOLD}║${RESET}\n" "Disk:" "$DISK"
+  echo -e "${RED}${BOLD}╚══════════════════════════════════════════════════╝${RESET}"
   echo
-  free -h
+  echo -e "${WHITE}${BOLD}CPU:${RESET} ${CYAN}$CPU${RESET}"
   echo
-  df -h
-  echo
-  curl -4 ifconfig.me 2>/dev/null || true
-  echo
+  echo -e "${YELLOW}${BOLD}Service Status:${RESET}"
+  systemctl is-active --quiet nginx && success_msg "Nginx running" || error_msg "Nginx not running"
+  systemctl is-active --quiet php8.3-fpm && success_msg "PHP-FPM running" || error_msg "PHP-FPM not running"
+  systemctl is-active --quiet pteroq && success_msg "Pteroq running" || warn_msg "Pteroq not running"
+  systemctl is-active --quiet wings && success_msg "Wings running" || warn_msg "Wings not running"
+  systemctl is-active --quiet mariadb && success_msg "MariaDB running" || warn_msg "MariaDB not running"
+  systemctl is-active --quiet redis-server && success_msg "Redis running" || warn_msg "Redis not running"
+
+  pause
+}
+
+view_logs() {
+  big_banner
+  box_title "LATEST INSTALL LOGS"
+
+  if [ ! -f "$LOG_FILE" ]; then
+    warn_msg "No logs found yet."
+    pause
+    return
+  fi
+
+  tail -n 120 "$LOG_FILE"
   pause
 }
 
