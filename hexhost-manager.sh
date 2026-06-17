@@ -80,8 +80,8 @@ banner() {
     echo "  ██║  ██║███████╗██╔╝ ██╗██║  ██║╚██████╔╝███████║   ██║   "
     echo "  ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝   ╚═╝   "
     echo -e "${RESET}"
-    echo -e "                         ${WHITE}${BOLD}🚀 HEXHOST MANAGER TOOL${RESET}"
-    echo -e "                         ${GRAY}${BOLD}ᴍᴀᴅᴇ ʙʏ : ɪᴍᴍᴜ${RESET}"
+    echo -e "             ${WHITE}${BOLD}🚀 HEXHOST MANAGER TOOL${RESET}"
+    echo -e "                  ${WHITE}${BOLD}ᴍᴀᴅᴇ ʙʏ : ɪᴍᴍᴜ${RESET}"
     echo -e "${RED}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
   fi
 
